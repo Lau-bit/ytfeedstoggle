@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Youtube feeds toggler v1",
+  "version": "1.0",
+  "description": "Combines feed, recommendations, description, comments, and controls toggles for YouTube.",
+  "permissions": ["activeTab", "tabs", "storage"],
+  "host_permissions": [
+    "*://www.youtube.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ]
+}

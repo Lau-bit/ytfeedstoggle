@@ -1,0 +1,163 @@
+/* ===================== */
+/* PLAYER LIKE BUTTONS   */
+/* ===================== */
+
+.ytp-like-dislike-container {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  height: 100%;
+  margin-left: 8px;
+  gap: 4px;
+}
+
+.ytp-like-btn,
+.ytp-dislike-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.9;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.ytp-like-btn:hover,
+.ytp-dislike-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.ytp-like-btn svg,
+.ytp-dislike-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: white;
+}
+
+.ytp-like-btn.active svg {
+  fill: #3ea6ff;
+}
+
+.ytp-dislike-btn.active svg {
+  fill: #ff6b6b;
+}
+
+/* ===================== */
+/* CONTROLS TOGGLE       */
+/* ===================== */
+
+/* Remove on-hover shadow gradients */
+.ytp-gradient-bottom,
+.ytp-gradient-top {
+  display: none !important;
+}
+
+/* Smooth transition for controls visibility toggle */
+.ytp-chrome-bottom,
+.ytp-chrome-controls,
+.ytp-progress-bar-container,
+.ytp-fullscreen-metadata,
+.ytp-fullscreen-quick-actions,
+yt-player-overlay-video-details-renderer,
+yt-player-quick-action-buttons,
+.ytp-fullscreen-grid-buttons-container {
+  transition: opacity 0.15s ease-in-out !important;
+}
+
+/* ===================== */
+/* HOMEPAGE FEED TOGGLE  */
+/* ===================== */
+
+/* Ensure feed toggle button stays above everything */
+#yt-feed-toggle-btn {
+  z-index: 9999 !important;
+}
+
+/* Smooth click feedback */
+#yt-feed-toggle-btn:active {
+  transform: translateX(-50%) scale(0.98) !important;
+}
+
+/* ================================= */
+/* WATCH PAGE RECOMMENDATIONS TOGGLE */
+/* ================================= */
+
+.yt-toggle-button {
+  background-color: #f9f9f9;
+  color: #030303;
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin: 16px 0;
+  width: 100%;
+  text-align: left;
+  transition: background-color 0.2s;
+}
+
+.yt-toggle-button:hover {
+  background-color: #e9e9e9;
+}
+
+.yt-toggle-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .yt-toggle-button {
+    background-color: #181818;
+    color: #f1f1f1;
+    border: 1px solid #3e3e3e;
+  }
+
+  .yt-toggle-button:hover {
+    background-color: #272727;
+  }
+}
+
+/* ===================== */
+/* COMMENTS TOGGLE       */
+/* ===================== */
+
+.yt-comments-toggle-button {
+  background-color: #f9f9f9;
+  color: #030303;
+  border: 1px solid #ccc;
+  border-radius: 2px;
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin: 16px 0;
+  width: 100%;
+  text-align: left;
+  transition: background-color 0.2s;
+  box-sizing: border-box;
+}
+
+.yt-comments-toggle-button:hover {
+  background-color: #e9e9e9;
+}
+
+.yt-comments-toggle-button:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
+}
+
+@media (prefers-color-scheme: dark) {
+  .yt-comments-toggle-button {
+    background-color: #181818;
+    color: #f1f1f1;
+    border: 1px solid #3e3e3e;
+  }
+
+  .yt-comments-toggle-button:hover {
+    background-color: #272727;
+  }
+}
