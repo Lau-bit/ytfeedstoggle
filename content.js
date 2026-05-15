@@ -187,6 +187,8 @@
 
   let recsObserver = null;
   let recsIsActive = false;
+  let recsResizeTimer = null;
+  let recsWatchPageKey = null;
   let toggleState = {
     recommendations: null,
     toggleContainer: null,
@@ -199,14 +201,58 @@
     return location.pathname.startsWith('/watch');
   }
 
+  function getWatchPageKey() {
+    return onWatchPage() ? (getVideoId() || location.href) : null;
+  }
+
+  function getDirectChildOf(parent, descendant) {
+    let node = descendant;
+    while (node && node.parentNode !== parent) {
+      node = node.parentNode;
+    }
+    return node && node.parentNode === parent ? node : null;
+  }
+
+  function safeInsertBefore(parent, node, referenceNode) {
+    if (!parent || !node) return false;
+    if (referenceNode && referenceNode.parentNode === parent) {
+      parent.insertBefore(node, referenceNode);
+    } else {
+      parent.appendChild(node);
+    }
+    return true;
+  }
+
+  function getOrCreateToggleRow() {
+    let row = document.getElementById('yt-ext-toggle-row');
+    if (row && document.body.contains(row)) return row;
+    const below = document.querySelector('#below');
+    if (!below) return null;
+    row = document.createElement('div');
+    row.id = 'yt-ext-toggle-row';
+    const metadata = below.querySelector('ytd-watch-metadata');
+    const metadataChild = metadata ? getDirectChildOf(below, metadata) : null;
+    const referenceNode = metadataChild ? metadataChild.nextSibling : below.firstElementChild;
+    return safeInsertBefore(below, row, referenceNode) ? row : null;
+  }
+
+  function cleanupToggleRowIfEmpty() {
+    const row = document.getElementById('yt-ext-toggle-row');
+    if (row && row.children.length === 0) row.remove();
+  }
+
   function initRecsToggle(recommendations) {
     if (!recommendations || recommendations.dataset.toggleInitialized === 'true') return;
 
-    recommendations.dataset.toggleInitialized = 'true';
-    toggleState.recommendations = recommendations;
-
     const parent = recommendations.parentElement;
     if (!parent) return;
+
+    if (toggleState.recommendations && toggleState.recommendations !== recommendations) {
+      cleanupRecsToggle();
+    }
+
+    recommendations.dataset.toggleInitialized = 'true';
+    toggleState.recommendations = recommendations;
 
     const toggleContainer = document.createElement('div');
     toggleContainer.style.display = 'flex';
@@ -220,47 +266,43 @@
 
     toggleContainer.appendChild(toggleButton);
 
-    const spacer = document.createElement('div');
-    spacer.style.width = '100%';
-    spacer.style.height = '0';
-    spacer.style.display = 'block';
-
     toggleState.toggleContainer = toggleContainer;
     toggleState.button = toggleButton;
-    toggleState.spacer = spacer;
+    toggleState.spacer = null;
     toggleState.isHidden = true;
 
-    parent.insertBefore(toggleContainer, recommendations);
-    parent.insertBefore(spacer, recommendations.nextSibling);
+    const row = getOrCreateToggleRow();
+    if (row) {
+      row.appendChild(toggleContainer);
+    } else {
+      safeInsertBefore(parent, toggleContainer, parent.firstElementChild);
+    }
 
     recommendations.style.display = 'none';
 
     toggleButton.addEventListener('click', () => {
-      const { recommendations: recs, spacer } = toggleState;
-      if (!recs || !spacer) return;
+      const { recommendations: recs } = toggleState;
+      if (!recs) return;
 
       toggleState.isHidden = !toggleState.isHidden;
 
       if (toggleState.isHidden) {
         recs.style.display = 'none';
-        spacer.style.display = 'block';
         toggleButton.textContent = 'Show recommendations';
       } else {
         recs.style.display = '';
-        spacer.style.display = 'none';
         toggleButton.textContent = 'Hide recommendations';
       }
     });
   }
 
   function cleanupRecsToggle() {
-    const { recommendations, toggleContainer, spacer } = toggleState;
+    const { recommendations, toggleContainer } = toggleState;
     if (recommendations) {
       recommendations.style.display = '';
       delete recommendations.dataset.toggleInitialized;
     }
-    if (toggleContainer) toggleContainer.remove();
-    if (spacer) spacer.remove();
+    if (toggleContainer) { toggleContainer.remove(); cleanupToggleRowIfEmpty(); }
     toggleState.recommendations = null;
     toggleState.toggleContainer = null;
     toggleState.button = null;
@@ -294,17 +336,47 @@
     recsObserver.observe(document.body, { childList: true, subtree: true });
   }
 
+  function handleRecsResize() {
+    if (!onWatchPage() || !recsIsActive) return;
+    const { toggleContainer } = toggleState;
+    if (!toggleContainer) return;
+    const inDOM = document.body.contains(toggleContainer);
+    const rect = toggleContainer.getBoundingClientRect();
+    if (!inDOM || (rect.width === 0 && rect.height === 0)) {
+      cleanupRecsToggle();
+      const recs = document.querySelector('#related');
+      if (recs) initRecsToggle(recs);
+    }
+  }
+
+  function debouncedRecsResize() {
+    clearTimeout(recsResizeTimer);
+    recsResizeTimer = setTimeout(handleRecsResize, 300);
+  }
+
   function activateForWatchPage() {
-    if (recsIsActive || !onWatchPage()) return;
+    if (!onWatchPage()) return;
+    const watchPageKey = getWatchPageKey();
+    if (recsIsActive && recsWatchPageKey === watchPageKey) return;
+    if (recsIsActive) {
+      stopWatchingRecommendations();
+      cleanupRecsToggle();
+    }
     recsIsActive = true;
+    recsWatchPageKey = watchPageKey;
     watchForRecommendations();
+    window.removeEventListener('resize', debouncedRecsResize);
+    window.addEventListener('resize', debouncedRecsResize);
   }
 
   function deactivateRecsForNonWatchPage() {
     if (!recsIsActive) return;
     recsIsActive = false;
+    recsWatchPageKey = null;
     stopWatchingRecommendations();
     cleanupRecsToggle();
+    window.removeEventListener('resize', debouncedRecsResize);
+    clearTimeout(recsResizeTimer);
   }
 
   // =====================
@@ -324,6 +396,9 @@
   function initCommentsToggle(commentsSection) {
     if (!commentsSection || commentsSection.dataset.commentsToggleInitialized === 'true') return;
 
+    const parent = commentsSection.parentNode;
+    if (!parent) return;
+
     commentsSection.dataset.commentsToggleInitialized = 'true';
 
     const toggleButton = document.createElement('button');
@@ -335,9 +410,13 @@
     spacer.style.height = '1666px';
     spacer.style.display = 'block';
 
-    const parent = commentsSection.parentNode;
-    parent.insertBefore(toggleButton, commentsSection);
-    parent.insertBefore(spacer, commentsSection);
+    const row = getOrCreateToggleRow();
+    if (row) {
+      row.appendChild(toggleButton);
+    } else {
+      safeInsertBefore(parent, toggleButton, commentsSection);
+    }
+    safeInsertBefore(parent, spacer, commentsSection);
 
     commentsSection.style.display = 'none';
     commentsToggleState.isHidden = true;
@@ -361,7 +440,7 @@
 
   function cleanupCommentsToggle() {
     const { comments, button, spacer } = commentsToggleState;
-    if (button && button.parentNode) button.parentNode.removeChild(button);
+    if (button && button.parentNode) { button.parentNode.removeChild(button); cleanupToggleRowIfEmpty(); }
     if (spacer && spacer.parentNode) spacer.parentNode.removeChild(spacer);
     if (comments) {
       comments.style.display = '';
@@ -566,29 +645,66 @@
     } catch (e) {}
   }
 
-  function applyControlsVisibility(visible) {
-    const selectors = [
-      '.ytp-chrome-bottom',
-      '.ytp-chrome-controls',
-      '.ytp-progress-bar-container',
-      '.ytp-fullscreen-metadata',
-      '.ytp-fullscreen-quick-actions',
-      'yt-player-overlay-video-details-renderer',
-      'yt-player-quick-action-buttons',
-      '.ytp-fullscreen-grid-buttons-container'
-    ];
+  const CONTROLS_TOGGLE_SELECTORS = [
+    '.ytp-chrome-bottom',
+    '.ytp-chrome-controls',
+    '.ytp-progress-bar-container',
+    '.ytp-fullscreen-metadata',
+    '.ytp-fullscreen-quick-actions',
+    'yt-player-overlay-video-details-renderer',
+    'yt-player-quick-action-buttons',
+    '.ytp-fullscreen-grid-buttons-container',
+    'button.ytp-playlist-menu-button'
+  ];
 
-    selectors.forEach(selector => {
-      const element = document.querySelector(selector);
-      if (element) {
-        if (visible) {
-          element.style.removeProperty('opacity');
-          element.style.removeProperty('pointer-events');
-        } else {
-          element.style.opacity = '0';
-          element.style.pointerEvents = 'none';
-        }
+  const CONTROLS_REMOVE_SELECTORS = [
+    '#movie_player .ytp-ce-hide-button-container'
+  ];
+
+  let controlsAreVisible = true;
+  let controlsMutationObserver = null;
+  let controlsApplyFrame = null;
+
+  function getControlsToggleTargets() {
+    return document.querySelectorAll(CONTROLS_TOGGLE_SELECTORS.join(','));
+  }
+
+  function getControlsRemoveTargets() {
+    return document.querySelectorAll(CONTROLS_REMOVE_SELECTORS.join(','));
+  }
+
+  function applyControlsVisibility(visible) {
+    controlsAreVisible = visible;
+    document.documentElement.classList.toggle('yt-controls-hidden', !visible);
+
+    getControlsToggleTargets().forEach(element => {
+      if (visible) {
+        element.style.removeProperty('opacity');
+        element.style.removeProperty('pointer-events');
+      } else {
+        element.style.opacity = '0';
+        element.style.pointerEvents = 'none';
       }
+    });
+
+    getControlsRemoveTargets().forEach(element => {
+      if (visible) {
+        element.style.removeProperty('display');
+        element.style.removeProperty('visibility');
+        element.style.removeProperty('pointer-events');
+      } else {
+        element.style.display = 'none';
+        element.style.visibility = 'hidden';
+        element.style.pointerEvents = 'none';
+      }
+    });
+  }
+
+  function scheduleControlsVisibilityRefresh() {
+    if (controlsAreVisible || controlsApplyFrame) return;
+    controlsApplyFrame = requestAnimationFrame(() => {
+      controlsApplyFrame = null;
+      applyControlsVisibility(false);
     });
   }
 
@@ -596,6 +712,9 @@
     safeSendMessage({ action: 'getControlsState' }, (response) => {
       if (response) applyControlsVisibility(response.visible);
     });
+
+    controlsMutationObserver = new MutationObserver(scheduleControlsVisibilityRefresh);
+    controlsMutationObserver.observe(document.body, { childList: true, subtree: true });
 
     document.addEventListener('mousedown', (e) => {
       if (e.button === 1) safeSendMessage({ action: 'ping' });
@@ -641,7 +760,14 @@
     }
   }
 
+  function injectStaticStyles() {
+    const style = document.createElement('style');
+    style.textContent = '.ytp-heat-map-container, .ytp-heat-map-chapter { display: none !important; } ytd-notification-topbar-button-renderer { display: none !important; } #voice-search-button { display: none !important; }';
+    (document.head || document.documentElement).appendChild(style);
+  }
+
   function init() {
+    injectStaticStyles();
     handleNavigation();
     attachLogoClickListener();
     initPlayerLikeButtons();
@@ -662,10 +788,10 @@
     window.addEventListener('popstate', handleNavigation);
 
     // Fallback: poll for URL path changes (SPA navigation)
-    let lastPath = location.pathname;
+    let lastHref = location.href;
     setInterval(() => {
-      if (location.pathname !== lastPath) {
-        lastPath = location.pathname;
+      if (location.href !== lastHref) {
+        lastHref = location.href;
         handleNavigation();
       }
     }, 1000);

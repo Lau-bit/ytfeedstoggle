@@ -63,8 +63,15 @@
 .ytp-fullscreen-quick-actions,
 yt-player-overlay-video-details-renderer,
 yt-player-quick-action-buttons,
-.ytp-fullscreen-grid-buttons-container {
+.ytp-fullscreen-grid-buttons-container,
+button.ytp-playlist-menu-button {
   transition: opacity 0.15s ease-in-out !important;
+}
+
+html.yt-controls-hidden #movie_player .ytp-ce-hide-button-container {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* ===================== */
