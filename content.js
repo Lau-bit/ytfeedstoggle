@@ -527,8 +527,6 @@
   let playlistAutoplaySeekingHandler = null;
   let playlistAutoplaySeekedHandler = null;
   let playlistAutoplayIsSeeking = false;
-  let nativeAutonavSyncInProgress = false;
-  let lastSessionAutonavState = null;
 
   function getVideoId() {
     return new URLSearchParams(window.location.search).get('v');
@@ -539,6 +537,14 @@
       new URLSearchParams(window.location.search).has('list') ||
       !!document.querySelector('.ytp-next-button.ytp-playlist-ui')
     );
+  }
+
+  function getNativeAutonavToggle() {
+    return document.querySelector('.ytp-autonav-toggle-button');
+  }
+
+  function onAutoplayWatchPage() {
+    return onWatchPage() && (onPlaylistWatchPage() || !!getNativeAutonavToggle());
   }
 
   function getLikeButton() {
@@ -581,12 +587,12 @@
         autoplayBtn.innerHTML = playlistAutoplayEnabled ? PLAYLIST_AUTOPLAY_ON_SVG : PLAYLIST_AUTOPLAY_OFF_SVG;
       }
 
-      const title = playlistAutoplayEnabled ? 'Playlist autoplay on' : 'Playlist autoplay off';
+      const title = playlistAutoplayEnabled ? 'Next video autoplay on' : 'Next video autoplay off';
       autoplayBtn.title = title;
       setAttributeIfChanged(
         autoplayBtn,
         'aria-label',
-        playlistAutoplayEnabled ? 'Turn playlist autoplay off' : 'Turn playlist autoplay on'
+        playlistAutoplayEnabled ? 'Turn next video autoplay off' : 'Turn next video autoplay on'
       );
       setAttributeIfChanged(autoplayBtn, 'aria-pressed', String(playlistAutoplayEnabled));
     }
@@ -611,37 +617,6 @@
 
   function isPlaylistAutoplayBlockApplied() {
     return !playlistAutoplayEnabled && playlistAutoplayBypassVideoId !== getVideoId();
-  }
-
-  function getEffectivePlaylistAutoplayEnabled() {
-    return playlistAutoplayEnabled || playlistAutoplayBypassVideoId === getVideoId();
-  }
-
-  function syncNativeAutonavToggle(clickNativeToggle = false) {
-    const nativeToggle = document.querySelector('.ytp-autonav-toggle-button');
-    const nativeEnabled = nativeToggle?.getAttribute('aria-checked') === 'true';
-    const effectiveAutoplayEnabled = getEffectivePlaylistAutoplayEnabled();
-
-    const sessionAutonavState = effectiveAutoplayEnabled ? '2' : '1';
-    if (lastSessionAutonavState !== sessionAutonavState) {
-      try {
-        sessionStorage.setItem('yt-player-autonavstate', sessionAutonavState);
-        lastSessionAutonavState = sessionAutonavState;
-      } catch (e) {}
-    }
-
-    if (
-      clickNativeToggle &&
-      nativeToggle &&
-      nativeEnabled !== effectiveAutoplayEnabled &&
-      !nativeAutonavSyncInProgress
-    ) {
-      nativeAutonavSyncInProgress = true;
-      nativeToggle.click();
-      setTimeout(() => {
-        nativeAutonavSyncInProgress = false;
-      }, 500);
-    }
   }
 
   function getPlayerVideo() {
@@ -676,7 +651,7 @@
   }
 
   function stopBeforePlaylistAdvance(video) {
-    if (!isPlaylistAutoplayBlockApplied() || !onPlaylistWatchPage()) return;
+    if (!isPlaylistAutoplayBlockApplied() || !onAutoplayWatchPage()) return;
     if (playlistAutoplayIsSeeking || video.seeking) return;
     if (!Number.isFinite(video.duration) || video.duration <= 0) return;
 
@@ -727,7 +702,7 @@
       maybeReapplyBlockAfterSeek(video);
     };
     playlistAutoplayEndedHandler = (event) => {
-      if (!isPlaylistAutoplayBlockApplied() || !onPlaylistWatchPage()) return;
+      if (!isPlaylistAutoplayBlockApplied() || !onAutoplayWatchPage()) return;
 
       event.preventDefault();
       event.stopImmediatePropagation();
@@ -746,13 +721,12 @@
   }
 
   function applyPlaylistAutoplayState() {
-    if (!onPlaylistWatchPage()) {
+    if (!onAutoplayWatchPage()) {
       detachPlaylistAutoplayGuard();
       updatePlayerButtonStates();
       return;
     }
 
-    syncNativeAutonavToggle();
     attachPlaylistAutoplayGuard();
     updatePlayerButtonStates();
   }
@@ -761,15 +735,13 @@
     playlistAutoplayEnabled = !playlistAutoplayEnabled;
     playlistAutoplayBypassVideoId = null;
     savePlaylistAutoplayState();
-    syncNativeAutonavToggle(true);
     applyPlaylistAutoplayState();
   }
 
   function allowPlaylistAutoplayFromUserPlaybackIntent() {
-    if (!isPlaylistAutoplayBlockApplied() || !onPlaylistWatchPage()) return;
+    if (!isPlaylistAutoplayBlockApplied() || !onAutoplayWatchPage()) return;
 
     playlistAutoplayBypassVideoId = getVideoId();
-    syncNativeAutonavToggle(true);
     attachPlaylistAutoplayGuard();
     updatePlayerButtonStates();
   }
@@ -841,7 +813,7 @@
     playerButtonsContainer.appendChild(likeBtn);
     playerButtonsContainer.appendChild(dislikeBtn);
 
-    if (onPlaylistWatchPage()) {
+    if (onAutoplayWatchPage()) {
       const autoplayBtn = document.createElement('button');
       autoplayBtn.className = 'ytp-playlist-autoplay-btn ytp-button';
       autoplayBtn.type = 'button';
@@ -864,7 +836,7 @@
 
     if (document.querySelector('.ytp-like-dislike-container')) {
       const hasAutoplayButton = !!document.querySelector('.ytp-playlist-autoplay-btn');
-      if (hasAutoplayButton !== onPlaylistWatchPage()) {
+      if (hasAutoplayButton !== onAutoplayWatchPage()) {
         document.querySelector('.ytp-like-dislike-container')?.remove();
       } else if (videoId !== currentVideoId) {
         if (playlistAutoplayBypassVideoId !== videoId) {
