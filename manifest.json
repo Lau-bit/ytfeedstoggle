@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Youtube feeds toggler v1",
   "version": "1.0.2",
-  "description": "Combines feed, recommendations, description, comments, and controls toggles for YouTube.",
+  "description": "Switches for recommendations, video description, comments and player controls.",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
